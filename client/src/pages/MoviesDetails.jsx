@@ -1,29 +1,52 @@
 import React from 'react'
 import { useParams } from 'react-router-dom'
-import { dummyDateTimeData } from '../assets/assets'
 import BlurCircle from '../components/BlurCircle'
 import { Heart, PlayCircleIcon, StarIcon } from 'lucide-react'
 import { useState, useEffect } from "react";
-import { dummyShowsData } from "../assets/assets";
 import timeFormat from "../lib/timeFormat"
 import DateSelect from '../components/DateSetect';
 import MovieCard from '../components/MovieCard'
 import { useNavigate } from 'react-router-dom'
 import Loading from '../components/Loading'
+import { useAppContext } from '../context/AppContext'
+import toast from 'react-hot-toast'
 
 const MoviesDetails = () => {
 
+    const { axios, getToken, favoriteMovies, fetchFavoriteMovies, shows, user, image_base_url } = useAppContext()
     const navigate = useNavigate()
     const { id } = useParams()
     const [show, setShow] = useState(null)
 
+    const isFavorite = favoriteMovies.some(movie => movie._id === id)
+
     const getShow = async () => {
-        const show = dummyShowsData.find(show => show._id === id)
-        if (show) {
-            setShow({
-                movie: show,
-                dateTime: dummyDateTimeData
-            })
+        try {
+            const { data } = await axios.get(`/api/show/${id}`);
+            if (data.success) {
+                setShow(data);
+            } 
+        } catch (error) {
+            console.log(error)
+        }
+    }
+
+    const toggleFavorite = async () => {
+        try {
+            const token = await getToken();
+            if (!token) {
+                return toast.error("Please login to save favorites");
+            }
+            const { data } = await axios.post('/api/user/update-favorite', { movieId: id }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (data.success) {
+                toast.success(data.message);
+                await fetchFavoriteMovies();
+            } 
+        } catch (error) {
+            console.error("Error updating favorite: ", error);
+            toast.error("Error updating favorite");
         }
     }
 
@@ -34,7 +57,7 @@ const MoviesDetails = () => {
     return show ? (
         <div className='px-6 md:px-16 lg:px-40 pt-30 md:pt-50'>
             <div className='flex flex-col md:flex-row gap-8 max-w-6xl mx-auto'>
-                <img src={show.movie.poster_path} alt="" className='max-md:mx-auto
+                <img src={image_base_url + show.movie.poster_path} alt="" className='max-md:mx-auto
                 rounded-xl h-104 max-w-70 object-cover'/>
 
                 <div className='relative flex flex-col gap-3'>
@@ -55,9 +78,9 @@ const MoviesDetails = () => {
                         cursor-pointer active:scale-95'>
                             <PlayCircleIcon className="w-5 h-5" />Watch Trailer</button>
                         <a href="#dateSelect" className='px-10 py-3 text-sm bg-primary hover:bg-primary-dull transition rounded-md font-mediumm cursor-pointer active:scale-95'>Buy Tickets</a>
-                        <button className='bg-gray-700 p-2.5 rounded-full transtion cursor-pointer active:scale-95'>
+                        <button onClick={toggleFavorite} className='bg-gray-700 p-2.5 rounded-full transition cursor-pointer active:scale-95'>
 
-                            <Heart className={`w-5 h-5`} /></button>
+                            <Heart className={`w-5 h-5 ${isFavorite ? "text-primary fill-primary" : "text-gray-300"}`} /></button>
                     </div>
 
                 </div>
@@ -67,7 +90,7 @@ const MoviesDetails = () => {
                 <div className='flex items-center gap-4 w-max px-4'>
                     {show.movie.casts.slice(0, 12).map((cast, index) => (
                         <div key={index} className='flex flex-col items-center text-center'>
-                            <img src={cast.profile_path} alt="" className='rounded-full h-20 md:h-20 aspect-square object-cover' />
+                            <img src={image_base_url + cast.profile_path} alt="" className='rounded-full h-20 md:h-20 aspect-square object-cover' />
                             <p className='font-medium text-xs mt-3 '>{cast.name}</p>
                         </div>
                     ))}
@@ -78,7 +101,7 @@ const MoviesDetails = () => {
 
             <p className='text-lg font-medium mt-20 mb-8'>You May Also Like</p>
             <div className='flex flex-wrap max-sm:justify-center gap-8'>
-                {dummyShowsData.slice(0, 4).map((movie, index) => (
+                {shows.slice(0, 4).map((movie, index) => (
                     <MovieCard key={index} movie={movie} />
 
                 ))}
